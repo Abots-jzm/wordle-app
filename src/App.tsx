@@ -7,16 +7,8 @@ type Guess = {
 	guess: string;
 	correctness: CellState[];
 };
-
-const TEMP_HISTORY: Guess[] = [
-	{ guess: "HELLO", correctness: ["green", "green", "green", "green", "green"] },
-	{ guess: "WORLD", correctness: ["yellow", "yellow", "yellow", "yellow", "yellow"] },
-	{ guess: "APPLE", correctness: ["gray", "gray", "gray", "gray", "gray"] },
-];
-
 function App() {
-	// const history = useState([] as Guess[]);
-	const [history, setHistory] = useState(TEMP_HISTORY);
+	const [history, setHistory] = useState([] as Guess[]);
 	const [currentGuess, setCurrentGuess] = useState("");
 	const [message, setmessage] = useState("");
 	const [currentGuessState, setCurrentGuessState] = useState<CellState[]>(
@@ -39,14 +31,17 @@ function App() {
 		setCurrentGuess("");
 	}
 
-	function handleContainerClick() {
-		// Focus the input when clicking anywhere in the container
-		inputRef.current?.focus();
+	function resetButton() {
+		setHistory([]);
+		setCurrentGuess("");
+		setCurrentGuessState(Array.from({ length: 5 }, () => "empty") as CellState[]);
+		setmessage("");
+		if (inputRef.current) inputRef.current.focus();
 	}
 
 	return (
 		<div className="h-screen w-full bg-[#121213] p-10 text-white">
-			<form ref={formRef} onSubmit={onSubmit} className="" onClick={handleContainerClick}>
+			<form ref={formRef} onSubmit={onSubmit} className="" onClick={() => inputRef.current?.focus()}>
 				<label htmlFor="guess" className="grid h-max w-max grid-cols-5 gap-2">
 					{history.map((guess, index) => (
 						<React.Fragment key={`guess-row-${index}`}>
@@ -96,6 +91,9 @@ function App() {
 				</label>
 				{message && <div className="text-red-500">{message}</div>}
 			</form>
+			<button className="mt-5 cursor-pointer rounded-lg bg-[#1f1f1f] p-2 px-4 text-white" onClick={resetButton}>
+				Reset
+			</button>
 		</div>
 	);
 }
