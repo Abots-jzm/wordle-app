@@ -144,7 +144,7 @@ function App() {
 										{letter}
 									</Cell>
 								))}
-							{Array.from({ length: 5 - history.length - (currentGuess ? 1 : 0) }).map((_, rowIndex) => (
+							{Array.from({ length: 5 - history.length }).map((_, rowIndex) => (
 								<React.Fragment key={`empty-row-${rowIndex}`}>
 									{Array.from({ length: 5 }).map((_, cellIndex) => (
 										<Cell key={cellIndex} state="empty">
@@ -179,9 +179,19 @@ function App() {
 					{suggestions.length > 0 ? (
 						<ul className="space-y-2">
 							{suggestions.map((suggestion, index) => (
-								<li key={index} className="flex justify-between">
-									<span className="font-mono text-lg">{suggestion.word.toUpperCase()}</span>
-									<span className="text-gray-400">Score: {(50 - suggestion.score).toFixed(2)}</span>
+								<li
+									key={index}
+									className={`flex justify-between ${index === 0 ? "rounded bg-[#292929] p-2" : ""}`}
+									onClick={() => {
+										// When clicked, fill in the input with this suggestion
+										setCurrentGuess(suggestion.word);
+										inputRef.current?.focus();
+									}}
+								>
+									<span className="cursor-pointer font-mono text-lg hover:underline">
+										{suggestion.word.toUpperCase()}
+									</span>
+									<span className="text-gray-400">{(-suggestion.score).toFixed(2)}</span>
 								</li>
 							))}
 						</ul>

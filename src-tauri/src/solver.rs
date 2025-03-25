@@ -131,9 +131,26 @@ impl Solver {
         let score = history.len() as f64;
 
         if let Some(last) = history.last() {
+            // We need to find the word index for the word the user actually used
+            let word_to_find = &last.word;
+
+            // Find the index of the word in DICTIONARY
+            let word_idx = DICTIONARY
+                .iter()
+                .position(|(word, _)| *word == word_to_find)
+                .unwrap_or_else(|| {
+                    // If we can't find it, just use the last guess index as fallback
+                    // (This shouldn't happen with proper validation)
+                    self.last_guess_idx.unwrap_or(0)
+                });
+
+            // Set the last guess index to the actual word used
+            self.last_guess_idx = Some(word_idx);
+
+            // Now filter using the correct word and its correctness pattern
             let reference = PackedCorrectness::from(last.mask);
             COMPUTES.with(|c| {
-                let row = &c.get().unwrap()[self.last_guess_idx.unwrap()];
+                let row = &c.get().unwrap()[word_idx];
                 self.trim(|word, word_idx| {
                     reference == get_packed(row, &last.word, word, word_idx)
                 });
@@ -212,11 +229,7 @@ impl Solver {
             let goodness = -(p_word * (score + 1.0)
                 + (1.0 - p_word) * (score + est_steps_left(remaining_entropy - e_info)));
 
-            candidates.push(Candidate {
-                word,
-                goodness,
-                idx: word_idx,
-            });
+            candidates.push(Candidate { word, goodness });
 
             if in_remaining {
                 i += 1;
@@ -229,11 +242,9 @@ impl Solver {
         // Sort candidates by goodness in descending order
         candidates.sort_by(|a, b| b.goodness.partial_cmp(&a.goodness).unwrap());
 
-        // Take the best candidate for self.last_guess_idx
-        if let Some(best) = candidates.first() {
-            assert_ne!(best.goodness, 0.0);
-            self.last_guess_idx = Some(best.idx);
-        }
+        // We're not automatically setting last_guess_idx here anymore
+        // Since we don't know which word the user will choose
+        // It will be set in the next call based on the actual word chosen
 
         // Return the top 10 candidates (or fewer if there aren't 10)
         let count = candidates.len().min(10);
@@ -252,5 +263,4 @@ impl Solver {
 struct Candidate {
     word: &'static str,
     goodness: f64,
-    idx: usize,
 }
