@@ -18,11 +18,25 @@ function App() {
 	// const history = useState([] as Guess[]);
 	const [history, setHistory] = useState(TEMP_HISTORY);
 	const [currentGuess, setCurrentGuess] = useState("");
+	const [message, setmessage] = useState("");
+	const [currentGuessState, setCurrentGuessState] = useState<CellState[]>(
+		Array.from({ length: 5 }, () => "empty") as CellState[],
+	);
 	const inputRef = useRef<HTMLInputElement>(null);
 	const formRef = useRef<HTMLFormElement>(null);
 
 	function onSubmit(e: React.FormEvent<HTMLFormElement>) {
 		e.preventDefault();
+		if (currentGuess.length !== 5) return setmessage("Guess must be 5 letters long.");
+		if (currentGuessState.some((state) => state === "empty"))
+			return setmessage("Please give all cells appriopriate colors by clicking them.");
+		setmessage("");
+
+		//Do rust stuff
+
+		setHistory((prevHistory) => [...prevHistory, { guess: currentGuess, correctness: currentGuessState }]);
+		setCurrentGuessState(Array.from({ length: 5 }, () => "empty") as CellState[]);
+		setCurrentGuess("");
 	}
 
 	function handleContainerClick() {
@@ -51,7 +65,13 @@ function App() {
 						.padEnd(5)
 						.split("")
 						.map((letter, index) => (
-							<Cell key={index} state="empty">
+							<Cell
+								key={index}
+								state="empty"
+								changeOnClick
+								cellIndex={index}
+								setCurrentGuessState={setCurrentGuessState}
+							>
 								{letter}
 							</Cell>
 						))}
@@ -74,6 +94,7 @@ function App() {
 						ref={inputRef}
 					/>
 				</label>
+				{message && <div className="text-red-500">{message}</div>}
 			</form>
 		</div>
 	);
