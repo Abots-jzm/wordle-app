@@ -1,36 +1,49 @@
 #![allow(clippy::type_complexity)]
 #![allow(clippy::blocks_in_if_conditions)]
 
-use std::{borrow::Cow, collections::HashSet, num::NonZeroU8, sync::Mutex};
+use serde::{Deserialize, Serialize};
+use std::{borrow::Cow, collections::HashSet, num::NonZeroU8, sync::Mutex}; // Add serde imports
 
 include!(concat!(env!("OUT_DIR"), "/dictionary.rs"));
 
 mod solver;
-use solver::Solver;
+use solver::{GuessResult, Solver};
 
 // State struct to hold our Solver instance
 struct AppState {
     guesser: Mutex<Solver>,
 }
 
+// Define a serializable version of Guess for the API
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApiGuess {
+    pub word: String,
+    pub mask: [ApiCorrectness; 5],
+}
+
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
-fn play(state: tauri::State<AppState>, guess: &str) -> Result<(), String> {
+fn play(state: tauri::State<AppState>, history: Vec<ApiGuess>) -> Result<Vec<GuessResult>, String> {
     let dictionary: HashSet<&'static str> =
         HashSet::from_iter(DICTIONARY.iter().copied().map(|(word, _)| word));
 
-    if !dictionary.contains(&*guess) {
-        return Err(format!("Word not in dictionary: {}", guess));
+    if !history.is_empty() && !dictionary.contains(history[0].word.as_str()) {
+        return Err(format!("Word not in dictionary: {}", history[0].word));
     }
 
+    // Convert ApiGuess to internal Guess
+    let internal_history: Vec<Guess> = history
+        .into_iter()
+        .map(|api_guess| Guess {
+            word: Cow::Owned(api_guess.word),
+            mask: api_guess.mask.map(|c| c.into()),
+        })
+        .collect();
+
     let mut guesser = state.guesser.lock().unwrap();
+    let results = guesser.guess(&internal_history);
 
-    // Compute next guess using the solver
-    // let mut history = Vec::with_capacity(6);
-    // history.push(guess.to_string());
-    // let next_guess = guesser.guess(&history);
-
-    Ok(())
+    Ok(results)
 }
 
 // Reset function to replace the solver with a new instance
@@ -52,6 +65,38 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![play, reset])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ApiCorrectness {
+    /// Green
+    Correct,
+    /// Yellow
+    Misplaced,
+    /// Gray
+    Wrong,
+}
+
+// Add conversion between ApiCorrectness and Correctness
+impl From<ApiCorrectness> for Correctness {
+    fn from(api: ApiCorrectness) -> Self {
+        match api {
+            ApiCorrectness::Correct => Correctness::Correct,
+            ApiCorrectness::Misplaced => Correctness::Misplaced,
+            ApiCorrectness::Wrong => Correctness::Wrong,
+        }
+    }
+}
+
+impl From<Correctness> for ApiCorrectness {
+    fn from(c: Correctness) -> Self {
+        match c {
+            Correctness::Correct => ApiCorrectness::Correct,
+            Correctness::Misplaced => ApiCorrectness::Misplaced,
+            Correctness::Wrong => ApiCorrectness::Wrong,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]

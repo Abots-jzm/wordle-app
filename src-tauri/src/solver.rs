@@ -1,6 +1,7 @@
 use crate::{Correctness, Guess, PackedCorrectness, DICTIONARY, MAX_MASK_ENUM};
 use once_cell::sync::OnceCell;
 use once_cell::unsync::OnceCell as UnSyncOnceCell;
+use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::cell::Cell;
 
@@ -17,6 +18,13 @@ pub struct Solver {
     entropy: Vec<f64>,
     hard_mode: bool,
     last_guess_idx: Option<usize>,
+}
+
+// New struct to return the guess results, with Serialize/Deserialize
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GuessResult {
+    pub word: String,
+    pub score: f64,
 }
 
 impl Default for Solver {
@@ -119,7 +127,7 @@ fn get_packed(
 }
 
 impl Solver {
-    pub fn guess(&mut self, history: &[Guess]) -> String {
+    pub fn guess(&mut self, history: &[Guess]) -> Vec<GuessResult> {
         let score = history.len() as f64;
 
         if let Some(last) = history.last() {
@@ -140,11 +148,17 @@ impl Solver {
                     .map(|&(_, _, idx)| idx)
                     .unwrap(),
             );
-            return FIRST_GUESS.to_string();
+            return vec![GuessResult {
+                word: FIRST_GUESS.to_string(),
+                score: 0.0,
+            }];
         } else if self.remaining.len() == 1 {
             let w = self.remaining.first().unwrap();
             self.last_guess_idx = Some(w.2);
-            return w.0.to_string();
+            return vec![GuessResult {
+                word: w.0.to_string(),
+                score: 0.0,
+            }];
         }
         assert!(!self.remaining.is_empty());
 
@@ -159,7 +173,7 @@ impl Solver {
             .sum::<f64>();
         self.entropy.push(remaining_entropy);
 
-        let mut best: Option<Candidate> = None;
+        let mut candidates = Vec::new();
         let mut i = 0;
         let stop = (self.remaining.len() / 3).max(20).min(self.remaining.len());
         let consider = if self.hard_mode {
@@ -197,21 +211,12 @@ impl Solver {
             let e_info = -sum;
             let goodness = -(p_word * (score + 1.0)
                 + (1.0 - p_word) * (score + est_steps_left(remaining_entropy - e_info)));
-            if let Some(c) = best {
-                if goodness > c.goodness {
-                    best = Some(Candidate {
-                        word,
-                        goodness,
-                        idx: word_idx,
-                    });
-                }
-            } else {
-                best = Some(Candidate {
-                    word,
-                    goodness,
-                    idx: word_idx,
-                });
-            }
+
+            candidates.push(Candidate {
+                word,
+                goodness,
+                idx: word_idx,
+            });
 
             if in_remaining {
                 i += 1;
@@ -220,10 +225,26 @@ impl Solver {
                 }
             }
         }
-        let best = best.unwrap();
-        assert_ne!(best.goodness, 0.0);
-        self.last_guess_idx = Some(best.idx);
-        best.word.to_string()
+
+        // Sort candidates by goodness in descending order
+        candidates.sort_by(|a, b| b.goodness.partial_cmp(&a.goodness).unwrap());
+
+        // Take the best candidate for self.last_guess_idx
+        if let Some(best) = candidates.first() {
+            assert_ne!(best.goodness, 0.0);
+            self.last_guess_idx = Some(best.idx);
+        }
+
+        // Return the top 10 candidates (or fewer if there aren't 10)
+        let count = candidates.len().min(10);
+        candidates
+            .iter()
+            .take(count)
+            .map(|c| GuessResult {
+                word: c.word.to_string(),
+                score: c.goodness,
+            })
+            .collect()
     }
 }
 
