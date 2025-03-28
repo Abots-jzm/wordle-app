@@ -25,20 +25,22 @@ function Cell({ state, children, changeOnClick, cellIndex, setCurrentGuessState 
 					return newState;
 				});
 			}
+		} else {
+			if (setCurrentGuessState && cellIndex !== undefined && currentState === "empty") {
+				setCurrentState("gray");
+				setCurrentGuessState((prevState) => {
+					const newState = [...prevState];
+					newState[cellIndex] = "gray";
+					return newState;
+				});
+			}
 		}
 	}, [children, setCurrentGuessState, cellIndex]);
 
 	function onCellClicked() {
 		if (!changeOnClick || children === "" || children === " ") return;
 
-		const nextState: CellState =
-			currentState === "green"
-				? "yellow"
-				: currentState === "yellow"
-					? "gray"
-					: currentState === "gray"
-						? "empty"
-						: "green";
+		const nextState: CellState = currentState === "green" ? "yellow" : currentState === "yellow" ? "gray" : "green";
 
 		setCurrentState(nextState);
 

@@ -191,8 +191,6 @@ impl Solver {
         self.entropy.push(remaining_entropy);
 
         let mut candidates = Vec::new();
-        let mut i = 0;
-        let stop = (self.remaining.len() / 3).max(20).min(self.remaining.len());
         let consider = if self.hard_mode {
             &*self.remaining
         } else {
@@ -230,13 +228,6 @@ impl Solver {
                 + (1.0 - p_word) * (score + est_steps_left(remaining_entropy - e_info)));
 
             candidates.push(Candidate { word, goodness });
-
-            if in_remaining {
-                i += 1;
-                if i >= stop {
-                    break;
-                }
-            }
         }
 
         // Sort candidates by goodness in descending order
